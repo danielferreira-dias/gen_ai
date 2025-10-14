@@ -2,10 +2,7 @@ from azure.ai.textanalytics import TextAnalyticsClient
 from azure.core.credentials import AzureKeyCredential
 import os 
 from dotenv import load_dotenv
-from dataclasses import dataclass
-
 load_dotenv()
-
 class AzureLanguageService:
     def __init__(self):
         self.client = TextAnalyticsClient(
@@ -19,7 +16,6 @@ class AzureLanguageService:
             response = self.client.recognize_pii_entities(documents, language="en")
             result = response[0]
 
-            # Convert result to dict
             result_dict = {
                 'id': result.id,
                 'redacted_text': result.redacted_text,

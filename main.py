@@ -25,9 +25,12 @@ async def main():
     else:
         print("No PII detected - using original text for LLM")
 
-    # Send tokenized text to agent
+    # Send tokenized text to agent (without conversation history for this demo)
     agent = Agent(model_name="gpt-5-chat")
-    response = await agent.llm_response(process_data.get('tokenized_text'))
+    response = await agent.llm_response(
+        user_query=process_data.get('tokenized_text'),
+        conversation_history=None  # No history for single-message demo
+    )
     print(('=' * 30) + 'Agent Response (Tokenized)' + ('=' * 30))
     print(f'{response}')
     print('=' * 60)

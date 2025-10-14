@@ -148,6 +148,51 @@ class ConversationStorage:
 
         return messages
 
+    def get_conversation_context(self, conversation_id: int, limit: Optional[int] = None) -> List[Dict]:
+        """
+        Get conversation messages formatted for agent context
+
+        Returns messages with tokenized_content if PII was detected,
+        otherwise returns original content. This ensures consistency
+        in how the agent sees messages.
+
+        Args:
+            conversation_id: The conversation ID
+            limit: Optional limit on number of messages to return (most recent)
+
+        Returns:
+            List of dicts with format: [{"role": "user|assistant", "content": "..."}]
+        """
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        query = """
+            SELECT role, content, tokenized_content, has_pii
+            FROM messages
+            WHERE conversation_id = ?
+            ORDER BY timestamp ASC
+        """
+
+        if limit:
+            # Get last N messages
+            query += f" LIMIT {limit}"
+
+        cursor.execute(query, (conversation_id,))
+        messages = cursor.fetchall()
+        conn.close()
+
+        # Format for agent: use tokenized content if PII was detected
+        context = []
+        for msg in messages:
+            content = msg['tokenized_content'] if msg['has_pii'] and msg['tokenized_content'] else msg['content']
+            context.append({
+                "role": msg['role'],
+                "content": content
+            })
+
+        return context
+
     def get_recent_conversations(self, user_id: str = "default", limit: int = 10) -> List[Dict]:
         """Get recent conversations for a user"""
         conn = sqlite3.connect(self.db_path)

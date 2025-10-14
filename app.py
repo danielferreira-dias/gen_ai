@@ -1,17 +1,27 @@
 import streamlit as st
 import asyncio
+import logging
 from services.processing import ProcessingService
 from services.pii import AzureLanguageService
 from services.agent import Agent
 from database.storage import ConversationStorage
 
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 # ---------- SETUP ----------
 st.set_page_config(page_title="PII-Aware Chatbot", page_icon="")
 
+logger.info("Initializing services...")
 azure_service = AzureLanguageService()
 agent = Agent(model_name="gpt-5-chat")
 processing_Service = ProcessingService()
 storage = ConversationStorage()
+logger.info("Services initialized successfully")
 
 # ---------- SESSION STATE ----------
 if "messages" not in st.session_state:
@@ -33,6 +43,7 @@ with st.sidebar:
     st.header("Conversation History")
 
     if st.button("New Conversation"):
+        logger.info("Starting new conversation - clearing session state")
         st.session_state.messages = []
         st.session_state.conversation_id = None
         st.rerun()
@@ -59,6 +70,7 @@ for msg in st.session_state.messages:
 
 # ---------- USER INPUT ----------
 if user_input := st.chat_input("Type your message..."):
+    logger.info(f"Received user input: {user_input[:50]}...")
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
@@ -69,6 +81,7 @@ if user_input := st.chat_input("Type your message..."):
     # Create conversation on first message
     if st.session_state.conversation_id is None:
         st.session_state.conversation_id = storage.create_conversation()
+        logger.info(f"Created new conversation with ID: {st.session_state.conversation_id}")
 
     # Create a placeholder for tracing
     with st.spinner("Processing..."):
@@ -105,6 +118,7 @@ if user_input := st.chat_input("Type your message..."):
                     st.info("ℹ️ No PII detected - using original text")
 
             # Store user message with PII data
+            logger.info(f"Storing user message in database (conversation_id: {st.session_state.conversation_id})")
             user_message_data = storage.add_message(
                 conversation_id=st.session_state.conversation_id,
                 role="user",
@@ -113,19 +127,37 @@ if user_input := st.chat_input("Type your message..."):
                 has_pii=process_data.get('has_pii', False),
                 pii_data=process_data if process_data.get('has_pii') else None
             )
+            logger.info(f"User message stored successfully (message_id: {user_message_data})")
 
         except Exception as e:
+            logger.error(f"Error during PII processing: {e}", exc_info=True)
             st.error(f"⚠️ Error during PII processing: {e}")
             tokenized_text = user_input
             process_data = {'has_pii': False}
 
     # ---------- AGENT RESPONSE ----------
     with st.spinner("Agent is thinking..."):
-        response = asyncio.run(agent.llm_response(tokenized_text))
+        # Fetch conversation history from database (excluding current message)
+        # This retrieves messages with tokenized content if PII was detected
+        logger.info(f"Fetching conversation context (conversation_id: {st.session_state.conversation_id})")
+        conversation_context = storage.get_conversation_context(
+            conversation_id=st.session_state.conversation_id,
+            limit=20  # Limit to last 20 messages to avoid token limits
+        )
+        logger.info(f"Retrieved {len(conversation_context) if conversation_context else 0} messages from history")
+
+        # Pass conversation history to agent
+        logger.info(f"Invoking agent with query: {tokenized_text[:50]}...")
+        response = asyncio.run(agent.llm_response(
+            user_query=tokenized_text,
+            conversation_history=conversation_context
+        ))
+        logger.info(f"Agent response received: {response[:100]}...")
 
     # De-tokenize if PII was found
     try:
         if process_data.get('has_pii'):
+            logger.info("Starting de-tokenization of agent response...")
             with st.expander("🔓 De-tokenization", expanded=debug_mode):
                 st.write("**Agent Response (Tokenized):**")
                 st.code(response)
@@ -140,17 +172,23 @@ if user_input := st.chat_input("Type your message..."):
                 st.success("✅ PII restored in response")
 
                 response = detokenized_response
+                logger.info("De-tokenization complete")
     except Exception as e:
+        logger.warning(f"De-tokenization skipped: {e}", exc_info=True)
         st.warning(f"⚠️ De-tokenization skipped: {e}")
 
     # Store assistant message
+    logger.info("Storing assistant message in database...")
     storage.add_message(
         conversation_id=st.session_state.conversation_id,
         role="assistant",
         content=response,
-        has_pii=False  
+        has_pii=False
     )
+    logger.info("Assistant message stored successfully")
 
     st.session_state.messages.append({"role": "assistant", "content": response})
     with st.chat_message("assistant"):
         st.markdown(response)
+
+    logger.info("Message exchange complete")

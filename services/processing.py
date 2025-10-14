@@ -9,7 +9,8 @@ class ProcessingService:
             "Address":"ADDRESS",
             "Organization":"ORGANIZATION",
             "City":"CITY",
-            "Location":"Location",
+            "Location":"LOCATION",
+            "Email":"EMAIL",
         }
 
     def tokenize_pii(self, data: dict):
