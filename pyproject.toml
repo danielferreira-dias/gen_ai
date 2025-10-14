@@ -22,4 +22,9 @@ dependencies = [
     "langchain-huggingface>=0.3.1",
     "langchain-postgres>=0.0.15",
     "python-dotenv>=1.1.1",
+    "azure-ai-textanalytics==5.2.0",                                                                                
+    "azure-common==1.1.28",
+    "msrest==0.7.1",
+    "oauthlib==3.3.1",
+    "requests-oauthlib==2.0.0",
 ]

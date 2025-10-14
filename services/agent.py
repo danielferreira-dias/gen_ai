@@ -10,6 +10,7 @@ load_dotenv()
 @dataclass
 class AgentOutput:
     response: str
+    
 class Agent:
     def __init__(self, model_name: str):
         self.model = AzureChatOpenAI(
