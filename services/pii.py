@@ -6,16 +6,6 @@ from dataclasses import dataclass
 
 load_dotenv()
 
-@dataclass
-class DetectedEntity:
-    """PII entity detected in text"""
-    text: str
-    entity_type: str  # e.g., "Person", "Location", "PhoneNumber"
-    start_pos: int
-    end_pos: int
-    confidence: float
-
-
 class AzureLanguageService:
     def __init__(self):
         self.client = TextAnalyticsClient(
@@ -23,9 +13,9 @@ class AzureLanguageService:
             credential=AzureKeyCredential(os.getenv("AZURE_AI_LANGUAGE_KEY"))
         )
     
-    def pii_recognition_example(self):
+    def pii_recognition_example(self, user_query : str ):
         try:
-            documents = ["I had a wonderful trip to Seattle last week. My number is 915518582, my name is John Doe from the office in Lisbon, 21th Street Market. Have you ever been there before?"]
+            documents = [f"{user_query}"]
             response = self.client.recognize_pii_entities(documents, language="en")
             result = response[0]
 
