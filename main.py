@@ -24,11 +24,28 @@ async def main():
     print(f'{process_data}')
     print('=' * 60)
 
-    agent = Agent(model_name="gpt-5-chat")  
+    # Check if PII was found
+    if process_data.get('has_pii'):
+        print("PII detected - using tokenized text for LLM")
+    else:
+        print("No PII detected - using original text for LLM")
+
+    # Send tokenized text to agent
+    agent = Agent(model_name="gpt-5-chat")
     response = await agent.llm_response(process_data.get('tokenized_text'))
-    print(('=' * 30) + 'Agent Response' + ('=' * 30))
+    print(('=' * 30) + 'Agent Response (Tokenized)' + ('=' * 30))
     print(f'{response}')
     print('=' * 60)
+
+    # De-tokenize the agent's response to restore PII
+    if process_data.get('has_pii'):
+        detokenized_response = processing_Service.detokenize_pii(
+            text=response,
+            token_map=process_data.get('token_map')
+        )
+        print(('=' * 30) + 'Agent Response (De-tokenized)' + ('=' * 30))
+        print(f'{detokenized_response}')
+        print('=' * 60)
 
 if __name__ == "__main__":
     asyncio.run(main())

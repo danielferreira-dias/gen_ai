@@ -10,7 +10,7 @@ load_dotenv()
 @dataclass
 class AgentOutput:
     response: str
-    
+
 class Agent:
     def __init__(self, model_name: str):
         self.model = AzureChatOpenAI(
@@ -25,7 +25,7 @@ class Agent:
             tools=[],
             response_format=AgentOutput
         )
-        self.system_prompt = "You're an internal company's model that's helping answer user queries",
+        self.system_prompt = "You're an internal company's model that's helping answer user queries, always mention the user's name in the beginning.",
 
 
     async def llm_response(self, user_query: str):

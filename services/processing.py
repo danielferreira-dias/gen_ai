@@ -14,16 +14,32 @@ class ProcessingService:
         Args:
             data: Dictionary containing 'id', 'redacted_text', 'entities', etc.
         Returns:
-            Dictionary with tokenized text and token mapping
+            Dictionary with tokenized text, token mapping, and has_pii flag
         """
 
         if data is None:
-            return
+            return None
+
         # Reset counters for this document
         self.category_counters = {}
         self.token_map = {}
+
         # Get the original text from entities (reconstruct from redacted text)
         entities = data.get('entities', [])
+
+        # Check if there are any PII entities
+        has_pii = len(entities) > 0
+
+        # If no PII, return original redacted_text as-is
+        if not has_pii:
+            return {
+                'original_id': data.get('id'),
+                'tokenized_text': data.get('redacted_text', ''),
+                'token_map': {},
+                'entities': [],
+                'has_pii': False
+            }
+
         # Sort entities by offset in reverse order to replace from end to start
         # This prevents offset shifting issues
         sorted_entities = sorted(entities, key=lambda x: x['offset'], reverse=True)
@@ -35,10 +51,10 @@ class ProcessingService:
             text = entity['text']
             offset = entity['offset']
             length = entity['length']
-            
-            category_upper = category.upper()
+
             # Special handling for specific categories
-            category_token = self.category_map.get('NUMBER', category_upper)
+            category_token = self.category_map.get(category, category.upper())
+
             # Increment counter for this category
             if category_token not in self.category_counters:
                 self.category_counters[category_token] = 0
@@ -58,27 +74,32 @@ class ProcessingService:
             'original_id': data.get('id'),
             'tokenized_text': tokenized_text,
             'token_map': self.token_map,
-            'entities': entities
+            'entities': entities,
+            'has_pii': True
         }
 
-    def detokenize_pii(self, data: dict):
+    def detokenize_pii(self, text: str, token_map: dict = None):
         """
-            Replace tokens back with original PII values.
-        Args:
-            data: Dictionary containing 'tokenized_text' and 'token_map'
-        Returns:
-            Original text with PII restored
-        """
-        tokenized_text = data.get('tokenized_text', '')
-        token_map = data.get('token_map', {})
+        Replace tokens back with original PII values.
 
-        detokenized_text = tokenized_text
+        Args:
+            text: Text containing tokens (e.g., agent response)
+            token_map: Dictionary mapping tokens to original values (uses self.token_map if not provided)
+
+        Returns:
+            Text with PII restored
+        """
+        if token_map is None:
+            token_map = self.token_map
+
+        # If no token map, return text as-is
+        if not token_map:
+            return text
+
+        detokenized_text = text
 
         # Replace each token with its original value
         for token, original_value in token_map.items():
             detokenized_text = detokenized_text.replace(token, original_value)
 
-        return {
-            'detokenized_text': detokenized_text,
-            'original_id': data.get('original_id')
-        }
+        return detokenized_text

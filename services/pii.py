@@ -25,7 +25,7 @@ class AzureLanguageService:
     
     def pii_recognition_example(self):
         try:
-            documents = ["I had a wonderful trip to Seattle last week. My number is 915518582, my name is John Doe from the office in Lisbon, 21th Street Market"]
+            documents = ["I had a wonderful trip to Seattle last week. My number is 915518582, my name is John Doe from the office in Lisbon, 21th Street Market. Have you ever been there before?"]
             response = self.client.recognize_pii_entities(documents, language="en")
             result = response[0]
 
