@@ -13,11 +13,12 @@ class ProcessingService:
             "Email":"EMAIL",
         }
 
-    def tokenize_pii(self, data: dict):
+    def tokenize_pii(self, data: dict, existing_token_map: dict = None):
         """
         Tokenize PII entities in the text with placeholders like <PERSON_1>, <NUMBER_1>, etc.
         Args:
             data: Dictionary containing 'id', 'redacted_text', 'entities', etc.
+            existing_token_map: Existing token map from the conversation to prevent token collisions
         Returns:
             Dictionary with tokenized text, token mapping, and has_pii flag
         """
@@ -25,9 +26,28 @@ class ProcessingService:
         if data is None:
             return None
 
-        # Reset counters for this document
+        # Initialize counters based on existing token map to avoid collisions
         self.category_counters = {}
         self.token_map = {}
+
+        if existing_token_map:
+            # Parse existing tokens to find the highest counter for each category
+            for token in existing_token_map.keys():
+                # Token format: <CATEGORY_NUMBER>
+                if token.startswith('<') and token.endswith('>'):
+                    token_content = token[1:-1]  # Remove < >
+                    parts = token_content.rsplit('_', 1)  # Split from the right to get category and number
+                    if len(parts) == 2:
+                        category, num_str = parts
+                        try:
+                            num = int(num_str)
+                            # Set counter to the max seen for this category
+                            if category not in self.category_counters:
+                                self.category_counters[category] = num
+                            else:
+                                self.category_counters[category] = max(self.category_counters[category], num)
+                        except ValueError:
+                            pass  # Skip if number parsing fails
 
         # Get the original text from entities (reconstruct from redacted text)
         entities = data.get('entities', [])

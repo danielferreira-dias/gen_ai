@@ -105,7 +105,15 @@ if user_input := st.chat_input("Type your message..."):
                     })
 
                 st.write("**Step 3:** Tokenizing PII...")
-                process_data = processing_Service.tokenize_pii(data=data)
+                # Get existing conversation token map to avoid token collisions
+                existing_token_map = storage.get_conversation_token_map(
+                    conversation_id=st.session_state.conversation_id
+                ) if st.session_state.conversation_id else {}
+
+                process_data = processing_Service.tokenize_pii(
+                    data=data,
+                    existing_token_map=existing_token_map
+                )
                 tokenized_text = process_data.get('tokenized_text', user_input)
 
                 if process_data.get('has_pii'):
@@ -128,6 +136,14 @@ if user_input := st.chat_input("Type your message..."):
                 pii_data=process_data if process_data.get('has_pii') else None
             )
             logger.info(f"User message stored successfully (message_id: {user_message_data})")
+
+            # Update conversation-level token map if PII was detected
+            if process_data.get('has_pii') and process_data.get('token_map'):
+                logger.info("Updating conversation-level token map with new PII tokens")
+                storage.update_conversation_token_map(
+                    conversation_id=st.session_state.conversation_id,
+                    new_token_map=process_data.get('token_map')
+                )
 
         except Exception as e:
             logger.error(f"Error during PII processing: {e}", exc_info=True)
@@ -154,41 +170,58 @@ if user_input := st.chat_input("Type your message..."):
         ))
         logger.info(f"Agent response received: {response[:100]}...")
 
-    # De-tokenize if PII was found
+    # Store the tokenized assistant response BEFORE de-tokenizing
+    # This ensures the agent always sees tokens in conversation history
+    tokenized_response = response  # Keep the tokenized version
+
+    # De-tokenize using conversation-level token map for display to user
+    detokenized_response = response  # Default to original if no de-tokenization needed
     try:
-        if process_data.get('has_pii'):
-            logger.info("Starting de-tokenization of agent response...")
+        # Get conversation-level token map (accumulated across all messages)
+        conversation_token_map = storage.get_conversation_token_map(
+            conversation_id=st.session_state.conversation_id
+        )
+
+        if conversation_token_map:
+            logger.info("Starting de-tokenization of agent response using conversation-level token map...")
             with st.expander("🔓 De-tokenization", expanded=debug_mode):
                 st.write("**Agent Response (Tokenized):**")
                 st.code(response)
 
+                st.write("**Available Token Map:**")
+                st.json(conversation_token_map)
+
                 detokenized_response = processing_Service.detokenize_pii(
                     text=response,
-                    token_map=process_data.get('token_map')
+                    token_map=conversation_token_map
                 )
 
                 st.write("**Agent Response (De-tokenized):**")
                 st.code(detokenized_response)
                 st.success("✅ PII restored in response")
-
-                response = detokenized_response
                 logger.info("De-tokenization complete")
     except Exception as e:
         logger.warning(f"De-tokenization skipped: {e}", exc_info=True)
         st.warning(f"⚠️ De-tokenization skipped: {e}")
 
-    # Store assistant message
+    # Store assistant message with BOTH versions:
+    # - content: de-tokenized (for display to user)
+    # - tokenized_content: tokenized (for agent context)
+    # - has_pii: True if response contains any tokens
+    has_tokens_in_response = tokenized_response != detokenized_response
+
     logger.info("Storing assistant message in database...")
     storage.add_message(
         conversation_id=st.session_state.conversation_id,
         role="assistant",
-        content=response,
-        has_pii=False
+        content=detokenized_response,  # Store de-tokenized for user display
+        tokenized_content=tokenized_response if has_tokens_in_response else None,  # Store tokenized for agent context
+        has_pii=has_tokens_in_response  # Mark as having PII if we de-tokenized it
     )
     logger.info("Assistant message stored successfully")
 
-    st.session_state.messages.append({"role": "assistant", "content": response})
+    st.session_state.messages.append({"role": "assistant", "content": detokenized_response})
     with st.chat_message("assistant"):
-        st.markdown(response)
+        st.markdown(detokenized_response)
 
     logger.info("Message exchange complete")

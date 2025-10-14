@@ -19,6 +19,7 @@ class ConversationStorage:
             CREATE TABLE IF NOT EXISTS conversations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT,
+                token_map TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -217,6 +218,68 @@ class ConversationStorage:
         conn.close()
 
         return conversations
+
+    def update_conversation_token_map(self, conversation_id: int, new_token_map: Dict):
+        """
+        Update the conversation-level token map by merging new tokens
+
+        Args:
+            conversation_id: The conversation ID
+            new_token_map: New token mappings to add/update
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # Get existing token map
+        cursor.execute(
+            "SELECT token_map FROM conversations WHERE id = ?",
+            (conversation_id,)
+        )
+        result = cursor.fetchone()
+
+        if result and result[0]:
+            # Parse existing token map and merge with new tokens
+            existing_map = json.loads(result[0])
+            existing_map.update(new_token_map)
+            merged_map = existing_map
+        else:
+            # No existing map, use new map
+            merged_map = new_token_map
+
+        # Update conversation with merged token map
+        cursor.execute(
+            "UPDATE conversations SET token_map = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (json.dumps(merged_map), conversation_id)
+        )
+
+        conn.commit()
+        conn.close()
+
+        return merged_map
+
+    def get_conversation_token_map(self, conversation_id: int) -> Dict:
+        """
+        Get the accumulated token map for a conversation
+
+        Args:
+            conversation_id: The conversation ID
+
+        Returns:
+            Dictionary mapping tokens to original PII values
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT token_map FROM conversations WHERE id = ?",
+            (conversation_id,)
+        )
+        result = cursor.fetchone()
+        conn.close()
+
+        if result and result[0]:
+            return json.loads(result[0])
+        return {}
 
     def delete_conversation(self, conversation_id: int):
         """Delete a conversation and all its messages"""
