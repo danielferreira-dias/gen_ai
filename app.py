@@ -1,3 +1,5 @@
+from database.evaluation import EvaluationStorage
+from services.evaluation_service import LLMJudge
 import streamlit as st
 import asyncio
 import logging
@@ -19,9 +21,16 @@ st.set_page_config(page_title="PII-Aware Chatbot", page_icon="")
 logger.info("Initializing services...")
 azure_service = AzureLanguageService()
 agent = Agent(model_name="gpt-5-chat")
+llm_judge = LLMJudge( model_name="gpt-5-chat", db_path="./db/evaluation.db")
 processing_Service = ProcessingService()
-storage = ConversationStorage()
 logger.info("Services initialized successfully")
+
+
+## Storage
+logger.info("Initializing Storages...")
+storage = ConversationStorage()
+evaluation_storage = EvaluationStorage()
+logger.info("Storages initialized successfully")
 
 # ---------- SESSION STATE ----------
 if "messages" not in st.session_state:
@@ -158,7 +167,7 @@ if user_input := st.chat_input("Type your message..."):
         logger.info(f"Fetching conversation context (conversation_id: {st.session_state.conversation_id})")
         conversation_context = storage.get_conversation_context(
             conversation_id=st.session_state.conversation_id,
-            limit=20  # Limit to last 20 messages to avoid token limits
+            limit=20 
         )
         logger.info(f"Retrieved {len(conversation_context) if conversation_context else 0} messages from history")
 
@@ -211,14 +220,39 @@ if user_input := st.chat_input("Type your message..."):
     has_tokens_in_response = tokenized_response != detokenized_response
 
     logger.info("Storing assistant message in database...")
-    storage.add_message(
+    assistant_message_id = storage.add_message(
         conversation_id=st.session_state.conversation_id,
         role="assistant",
         content=detokenized_response,  # Store de-tokenized for user display
         tokenized_content=tokenized_response if has_tokens_in_response else None,  # Store tokenized for agent context
         has_pii=has_tokens_in_response  # Mark as having PII if we de-tokenized it
     )
-    logger.info("Assistant message stored successfully")
+    logger.info(f"Assistant message stored successfully (message_id: {assistant_message_id})")
+
+    # ---------- EVALUATE ANSWER - LLM AS A JUDGE ----------
+    # Evaluate AFTER de-tokenization so the judge sees the actual response
+    with st.spinner("Evaluating response..."):
+        try:
+            judge_evaluation = asyncio.run(llm_judge.evaluate(
+                user_query=user_input,  # Use original user input (not tokenized)
+                agent_response=tokenized_response,  # Use de-tokenized response for proper evaluation
+                conversation_id=st.session_state.conversation_id,
+                message_id=assistant_message_id  # Link to assistant's message, not user's
+            ))
+            logger.info(f"LLM Judge evaluation complete: score={judge_evaluation.overall_score}/10")
+            if debug_mode:
+                with st.expander("🧑‍⚖️ LLM Judge Evaluation", expanded=True):
+                    st.write(f"**Relevance:** {judge_evaluation.relevance}")
+                    st.write(f"**Accuracy:** {judge_evaluation.accuracy}")
+                    st.write(f"**PII Violation:** {judge_evaluation.pii_violation}")
+                    st.write(f"**Safety Violation:** {judge_evaluation.safety_violation}")
+                    st.write(f"**Clarity:** {judge_evaluation.clarity}")
+                    st.write(f"**Overall Score:** {judge_evaluation.overall_score}/10")
+                    st.write("**Rationale:**")
+                    st.markdown(judge_evaluation.rationale)
+        except Exception as e:
+            logger.error(f"Error during LLM Judge evaluation: {e}", exc_info=True)
+            st.error(f"⚠️ Error during evaluation: {e}")
 
     st.session_state.messages.append({"role": "assistant", "content": detokenized_response})
     with st.chat_message("assistant"):

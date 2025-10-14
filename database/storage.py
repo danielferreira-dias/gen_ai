@@ -5,7 +5,7 @@ from typing import List, Dict, Optional
 import os
 
 class ConversationStorage:
-    def __init__(self, db_path: str = "conversations.db"):
+    def __init__(self, db_path: str = "./db/conversations.db"):
         self.db_path = db_path
         self.init_database()
 
