@@ -39,6 +39,9 @@ if "messages" not in st.session_state:
 if "conversation_id" not in st.session_state:
     st.session_state.conversation_id = None
 
+if "message_metadata" not in st.session_state:
+    st.session_state.message_metadata = {}  # Stores {message_index: {"message_id": int, "evaluation_id": int}}
+
 # ---------- TITLE ----------
 st.title("🤖 Agent Chatbot")
 
@@ -55,6 +58,7 @@ with st.sidebar:
         logger.info("Starting new conversation - clearing session state")
         st.session_state.messages = []
         st.session_state.conversation_id = None
+        st.session_state.message_metadata = {}
         st.rerun()
 
     st.divider()
@@ -73,9 +77,37 @@ with st.sidebar:
             st.info("No PII detected in this conversation")
 
 # ---------- DISPLAY CHAT ----------
-for msg in st.session_state.messages:
+for idx, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+
+        # Add feedback widget for assistant messages
+        if msg["role"] == "assistant" and idx in st.session_state.message_metadata:
+            metadata = st.session_state.message_metadata[idx]
+            message_id = metadata.get("message_id")
+            evaluation_id = metadata.get("evaluation_id")
+
+            def handle_feedback():
+                feedback_key = f"feedback_{idx}"
+                if feedback_key in st.session_state and st.session_state[feedback_key] is not None:
+                    feedback_value = st.session_state[feedback_key]
+                    try:
+                        evaluation_storage.save_user_feedback(
+                            conversation_id=st.session_state.conversation_id,
+                            message_id=message_id,
+                            feedback=feedback_value,
+                            evaluation_id=evaluation_id
+                        )
+                        logger.info(f"User feedback saved: message_id={message_id}, feedback={feedback_value}")
+                        st.toast("Thanks for your feedback!" if feedback_value == 1 else "Thanks for letting us know!", icon="👍" if feedback_value == 1 else "👎")
+                    except Exception as e:
+                        logger.error(f"Error saving feedback: {e}")
+
+            st.feedback(
+                "thumbs",
+                key=f"feedback_{idx}",
+                on_change=handle_feedback
+            )
 
 # ---------- USER INPUT ----------
 if user_input := st.chat_input("Type your message..."):
@@ -231,15 +263,13 @@ if user_input := st.chat_input("Type your message..."):
 
     # ---------- EVALUATE ANSWER - LLM AS A JUDGE ----------
     # Evaluate AFTER de-tokenization so the judge sees the actual response
+    evaluation_id = None
     with st.spinner("Evaluating response..."):
         try:
-            judge_evaluation = asyncio.run(llm_judge.evaluate(
-                user_query=user_input,  # Use original user input (not tokenized)
-                agent_response=tokenized_response,  # Use de-tokenized response for proper evaluation
-                conversation_id=st.session_state.conversation_id,
-                message_id=assistant_message_id  # Link to assistant's message, not user's
+            judge_evaluation = asyncio.run(llm_judge.evaluate( user_query=user_input, agent_response=detokenized_response, conversation_id=st.session_state.conversation_id, message_id=assistant_message_id  # Link to assistant's message, not user's
             ))
-            logger.info(f"LLM Judge evaluation complete: score={judge_evaluation.overall_score}/10")
+            evaluation_id = llm_judge.storage.db_path 
+            logger.info(f"LLM Judge evaluation complete: score={judge_evaluation.overall_score}/5")
             if debug_mode:
                 with st.expander("🧑‍⚖️ LLM Judge Evaluation", expanded=True):
                     st.write(f"**Relevance:** {judge_evaluation.relevance}")
@@ -247,15 +277,45 @@ if user_input := st.chat_input("Type your message..."):
                     st.write(f"**PII Violation:** {judge_evaluation.pii_violation}")
                     st.write(f"**Safety Violation:** {judge_evaluation.safety_violation}")
                     st.write(f"**Clarity:** {judge_evaluation.clarity}")
-                    st.write(f"**Overall Score:** {judge_evaluation.overall_score}/10")
+                    st.write(f"**Overall Score:** {judge_evaluation.overall_score}/5")
                     st.write("**Rationale:**")
                     st.markdown(judge_evaluation.rationale)
         except Exception as e:
             logger.error(f"Error during LLM Judge evaluation: {e}", exc_info=True)
             st.error(f"⚠️ Error during evaluation: {e}")
 
+    # Store message metadata for feedback widget
+    message_index = len(st.session_state.messages)
+    st.session_state.message_metadata[message_index] = {
+        "message_id": assistant_message_id,
+        "evaluation_id": evaluation_id
+    }
+
     st.session_state.messages.append({"role": "assistant", "content": detokenized_response})
     with st.chat_message("assistant"):
         st.markdown(detokenized_response)
+
+        # Add feedback widget for the newly added message
+        def handle_new_feedback():
+            feedback_key = f"feedback_{message_index}"
+            if feedback_key in st.session_state and st.session_state[feedback_key] is not None:
+                feedback_value = st.session_state[feedback_key]
+                try:
+                    evaluation_storage.save_user_feedback(
+                        conversation_id=st.session_state.conversation_id,
+                        message_id=assistant_message_id,
+                        feedback=feedback_value,
+                        evaluation_id=evaluation_id
+                    )
+                    logger.info(f"User feedback saved: message_id={assistant_message_id}, feedback={feedback_value}")
+                    st.toast("Thanks for your feedback!" if feedback_value == 1 else "Thanks for letting us know!", icon="👍" if feedback_value == 1 else "👎")
+                except Exception as e:
+                    logger.error(f"Error saving feedback: {e}")
+
+        st.feedback(
+            "thumbs",
+            key=f"feedback_{message_index}",
+            on_change=handle_new_feedback
+        )
 
     logger.info("Message exchange complete")

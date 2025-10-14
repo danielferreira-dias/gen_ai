@@ -20,13 +20,13 @@ class EvaluationStorage:
                 message_id INTEGER,
                 user_query TEXT NOT NULL,
                 assistant_response TEXT NOT NULL,
-                relevance TEXT CHECK(relevance IN ('High', 'Medium', 'Low')),
-                accuracy TEXT CHECK(accuracy IN ('Accurate', 'Partially Accurate', 'Inaccurate')),
-                pii_violation INTEGER CHECK(pii_violation IN (0, 1)) DEFAULT 0,
-                safety_violation INTEGER CHECK(safety_violation IN (0, 1)) DEFAULT 0,
-                clarity TEXT CHECK(clarity IN ('Excellent', 'Good', 'Poor')),
-                overall_score INTEGER CHECK(overall_score >= 0 AND overall_score <= 5),
-                rationale TEXT,
+                relevance INTEGER CHECK(relevance >= 0 AND relevance <= 5) NOT NULL,
+                accuracy INTEGER CHECK(accuracy >= 0 AND accuracy <= 5) NOT NULL,
+                pii_violation INTEGER CHECK(pii_violation IN (0, 1)) NOT NULL DEFAULT 0,
+                safety_violation INTEGER CHECK(safety_violation IN (0, 1)) NOT NULL DEFAULT 0,
+                clarity INTEGER CHECK(clarity >= 0 AND clarity <= 5) NOT NULL,
+                overall_score INTEGER CHECK(overall_score >= 0 AND overall_score <= 5) NOT NULL,
+                rationale TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -69,6 +69,29 @@ class EvaluationStorage:
             ON daily_metrics(date)
         """)
 
+        # User feedback table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                conversation_id INTEGER,
+                message_id INTEGER,
+                evaluation_id INTEGER,
+                feedback INTEGER CHECK(feedback IN (0, 1)),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (evaluation_id) REFERENCES llm_judge_evaluations(id)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_feedback_message
+            ON user_feedback(message_id)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_feedback_evaluation
+            ON user_feedback(evaluation_id)
+        """)
+
         conn.commit()
         conn.close()
 
@@ -76,11 +99,11 @@ class EvaluationStorage:
         self,
         user_query: str,
         assistant_response: str,
-        relevance: str,
-        accuracy: str,
+        relevance: int,
+        accuracy: int,
         pii_violation: int,
         safety_violation: int,
-        clarity: str,
+        clarity: int,
         overall_score: int,
         rationale: str,
         conversation_id: Optional[int] = None,
@@ -92,12 +115,12 @@ class EvaluationStorage:
         Args:
             user_query: The user's query that was evaluated
             assistant_response: The assistant's response that was evaluated
-            relevance: High, Medium, or Low
-            accuracy: Accurate, Partially Accurate, or Inaccurate
+            relevance: Relevance score (0-5)
+            accuracy: Accuracy score (0-5)
             pii_violation: Whether PII violation was detected (0 or 1)
             safety_violation: Whether safety violation was detected (0 or 1)
-            clarity: Excellent, Good, or Poor
-            overall_score: Score from 0-5
+            clarity: Clarity score (0-5)
+            overall_score: Overall quality score (0-5)
             rationale: Explanation of the evaluation
             conversation_id: Optional reference to conversation
             message_id: Optional reference to specific message
@@ -146,54 +169,96 @@ class EvaluationStorage:
         conn.commit()
         conn.close()
 
-    def delete_old_evaluations(self, days_to_keep: int = 90):
-        """Delete evaluations older than specified days"""
+    def save_user_feedback(
+        self,
+        conversation_id: int,
+        message_id: int,
+        feedback: int,
+        evaluation_id: Optional[int] = None
+    ) -> int:
+        """
+        Save user feedback (thumbs up/down) for a message
+
+        Args:
+            conversation_id: The conversation ID
+            message_id: The message ID being rated
+            feedback: 0 for thumbs down, 1 for thumbs up
+            evaluation_id: Optional link to LLM judge evaluation
+
+        Returns:
+            feedback_id: The ID of the inserted feedback record
+        """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         cursor.execute(
             """
-            DELETE FROM llm_judge_evaluations
-            WHERE created_at < datetime('now', '-' || ? || ' days')
+            INSERT INTO user_feedback (conversation_id, message_id, evaluation_id, feedback)
+            VALUES (?, ?, ?, ?)
             """,
-            (days_to_keep,)
+            (conversation_id, message_id, evaluation_id, feedback)
         )
+        feedback_id = cursor.lastrowid
 
-        deleted_count = cursor.rowcount
         conn.commit()
         conn.close()
 
-        return deleted_count
+        return feedback_id
+
+    def get_feedback_for_message(self, message_id: int) -> Optional[int]:
+        """
+        Get user feedback for a specific message
+
+        Args:
+            message_id: The message ID
+
+        Returns:
+            Feedback value (0 or 1) or None if no feedback exists
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT feedback FROM user_feedback WHERE message_id = ? ORDER BY created_at DESC LIMIT 1",
+            (message_id,)
+        )
+        result = cursor.fetchone()
+        conn.close()
+
+        return result[0] if result else None
 
     def _update_daily_metrics(self, cursor, date):
         """
-        Update or create daily metrics for the given date
+        Update daily metrics aggregation table
 
         Args:
-            cursor: Active database cursor
-            date: Date object for which to update metrics
+            cursor: Database cursor
+            date: Date to update metrics for
         """
-        date_str = date.strftime('%Y-%m-%d')
-
-        # Calculate metrics for the date
-        cursor.execute("""
+        # Get all evaluations for the date
+        cursor.execute(
+            """
             SELECT
                 COUNT(*) as total,
                 AVG(overall_score) as avg_score,
-                SUM(CASE WHEN relevance = 'High' THEN 1 ELSE 0 END) as high_rel,
-                SUM(CASE WHEN relevance = 'Medium' THEN 1 ELSE 0 END) as medium_rel,
-                SUM(CASE WHEN relevance = 'Low' THEN 1 ELSE 0 END) as low_rel,
-                SUM(CASE WHEN pii_violation = 1 THEN 1 ELSE 0 END) as pii_count,
-                SUM(CASE WHEN safety_violation = 1 THEN 1 ELSE 0 END) as safety_count
+                SUM(CASE WHEN relevance >= 4 THEN 1 ELSE 0 END) as high_relevance,
+                SUM(CASE WHEN relevance = 3 THEN 1 ELSE 0 END) as medium_relevance,
+                SUM(CASE WHEN relevance <= 2 THEN 1 ELSE 0 END) as low_relevance,
+                SUM(pii_violation) as pii_violations,
+                SUM(safety_violation) as safety_violations
             FROM llm_judge_evaluations
             WHERE DATE(created_at) = ?
-        """, (date_str,))
-
+            """,
+            (date,)
+        )
         result = cursor.fetchone()
 
-        if result[0] > 0:  # If there are evaluations for this date
-            # Insert or replace the daily metrics
-            cursor.execute("""
+        if result:
+            total, avg_score, high_rel, med_rel, low_rel, pii_viol, safety_viol = result
+
+            # Insert or update daily metrics
+            cursor.execute(
+                """
                 INSERT INTO daily_metrics (
                     date, total_evaluations, avg_score,
                     high_relevance_count, medium_relevance_count, low_relevance_count,
@@ -209,13 +274,6 @@ class EvaluationStorage:
                     pii_violations = excluded.pii_violations,
                     safety_violations = excluded.safety_violations,
                     updated_at = CURRENT_TIMESTAMP
-            """, (
-                date_str,
-                result[0],  # total
-                result[1],  # avg_score
-                result[2],  # high_rel
-                result[3],  # medium_rel
-                result[4],  # low_rel
-                result[5],  # pii_count
-                result[6]   # safety_count
-            ))
+                """,
+                (date, total or 0, avg_score or 0.0, high_rel or 0, med_rel or 0, low_rel or 0, pii_viol or 0, safety_viol or 0)
+            )

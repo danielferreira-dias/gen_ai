@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Optional
 from utils.prompts import llm_judge_prompt
 from database.evaluation import EvaluationStorage
 import logging
@@ -21,11 +21,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class JudgeOutput:
-    relevance: Literal["High", "Medium", "Low"]
-    accuracy: Literal["Accurate", "Partially Accurate", "Inaccurate"]
+    relevance: int  # 0-5 scale
+    accuracy: int  # 0-5 scale
     pii_violation: int  # 0 or 1
     safety_violation: int  # 0 or 1
-    clarity: Literal["Excellent", "Good", "Poor"]
+    clarity: int  # 0-5 scale
     overall_score: int  # 0-5 scale
     rationale: str
 
@@ -103,7 +103,12 @@ class LLMJudge(EvaluationService):
             if judge_output is None:
                 self.logger.error("LLM Judge returned no response")
                 judge_output = self._get_failed_evaluation("No response from judge model")
-
+            else:
+                # Ensure pii_violation and safety_violation have default values if None
+                if judge_output.pii_violation is None:
+                    judge_output.pii_violation = 0
+                if judge_output.safety_violation is None:
+                    judge_output.safety_violation = 0
 
             # Save to database
             self.save_evaluation(judge_output, user_query, agent_response, conversation_id, message_id)
@@ -118,11 +123,11 @@ class LLMJudge(EvaluationService):
     def _get_failed_evaluation(self, reason: str) -> JudgeOutput:
         """Return a default failed evaluation output"""
         return JudgeOutput(
-            relevance="Low",
-            accuracy="Inaccurate",
+            relevance=0,
+            accuracy=0,
             pii_violation=0,
             safety_violation=0,
-            clarity="Poor",
+            clarity=0,
             overall_score=0,
             rationale=f"Evaluation failed - {reason}"
         )
