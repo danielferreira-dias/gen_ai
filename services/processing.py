@@ -5,7 +5,7 @@ class ProcessingService:
         self.category_map = {
             "PhoneNumber": "NUMBER",
             "Address": "LOCATION_OFFICE",
-            # Add other special mappings here if needed
+            "Person": "PERSON"
         }
 
     def tokenize_pii(self, data: dict):
@@ -35,17 +35,10 @@ class ProcessingService:
             text = entity['text']
             offset = entity['offset']
             length = entity['length']
-
             
             category_upper = category.upper()
             # Special handling for specific categories
-            if category == 'PhoneNumber':
-                category_token = 'NUMBER'
-            elif category == 'Address':
-                category_token = 'LOCATION_OFFICE'
-            else:
-                category_token = category_upper
-
+            category_token = self.category_map.get('NUMBER', category_upper)
             # Increment counter for this category
             if category_token not in self.category_counters:
                 self.category_counters[category_token] = 0
@@ -59,10 +52,6 @@ class ProcessingService:
             # Store mapping for detokenization
             self.token_map[token] = text
 
-            # Replace in text (using offset and length)
-            # Note: redacted_text has asterisks, we need to replace those
-            # Find the asterisk sequence or the actual text
-            # Since we're working backwards, offsets remain valid
             tokenized_text = tokenized_text[:offset] + token + tokenized_text[offset + length:]
 
         return {

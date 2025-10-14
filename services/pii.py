@@ -1,10 +1,20 @@
 from azure.ai.textanalytics import TextAnalyticsClient
 from azure.core.credentials import AzureKeyCredential
 import os 
-import json
 from dotenv import load_dotenv
+from dataclasses import dataclass
 
 load_dotenv()
+
+@dataclass
+class DetectedEntity:
+    """PII entity detected in text"""
+    text: str
+    entity_type: str  # e.g., "Person", "Location", "PhoneNumber"
+    start_pos: int
+    end_pos: int
+    confidence: float
+
 
 class AzureLanguageService:
     def __init__(self):
