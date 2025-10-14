@@ -6,7 +6,7 @@ from services.agent import Agent
 from database.storage import ConversationStorage
 
 # ---------- SETUP ----------
-st.set_page_config(page_title="PII-Aware Chatbot", page_icon="🤖")
+st.set_page_config(page_title="PII-Aware Chatbot", page_icon="")
 
 azure_service = AzureLanguageService()
 agent = Agent(model_name="gpt-5-chat")
@@ -30,12 +30,12 @@ with st.sidebar:
 
     st.divider()
 
-    st.header("💾 Conversation History")
+    st.header("Conversation History")
     if st.button("🗑️ Clear Current Chat"):
         st.session_state.messages = []
         st.rerun()
 
-    if st.button("➕ New Conversation"):
+    if st.button("New Conversation"):
         st.session_state.messages = []
         st.session_state.conversation_id = storage.create_conversation()
         st.rerun()
@@ -59,7 +59,7 @@ with st.sidebar:
     st.divider()
 
     # PII Audit Log
-    st.header("🔒 PII Audit")
+    st.header("PII Audit")
     if st.button("View PII Log"):
         pii_logs = storage.get_pii_audit_log(conversation_id=st.session_state.conversation_id)
         if pii_logs:
@@ -83,7 +83,7 @@ if user_input := st.chat_input("Type your message..."):
         st.markdown(user_input)
 
     # Store user message (will update with PII data later if detected)
-    user_message_id = None
+    user_message_data = None
 
     # Create a placeholder for tracing
     with st.spinner("Processing..."):
@@ -120,7 +120,7 @@ if user_input := st.chat_input("Type your message..."):
                     st.info("ℹ️ No PII detected - using original text")
 
             # Store user message with PII data
-            user_message_id = storage.add_message(
+            user_message_data = storage.add_message(
                 conversation_id=st.session_state.conversation_id,
                 role="user",
                 content=user_input,
