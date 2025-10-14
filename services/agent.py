@@ -1,16 +1,16 @@
 import os
 from dotenv import load_dotenv
-import AzureChatOpenAI
-from langchain_core.messages import HumanMessage, SystemMessage, AIMesssage
+from langchain_openai import AzureChatOpenAI
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from dataclasses import dataclass
+from langchain.agents import create_agent
 
 load_dotenv()
 
 @dataclass
 class AgentOutput:
     response: str
-
-class LLM:
+class Agent:
     def __init__(self, model_name: str):
         self.model = AzureChatOpenAI(
             azure_deployment=model_name,
@@ -19,10 +19,15 @@ class LLM:
             api_key=os.getenv("AZURE_OPENAI_API_KEY"),
             temperature=1,
         )
+        self.agent = create_agent(
+            model=self.model,
+            tools=[],
+            response_format=AgentOutput
+        )
+        self.system_prompt = "You're an internal company's model that's helping answer user queries",
 
-        self.system_prompt = "You're an internal company's model that's helping answer user queries"
 
-    async def response(self, user_query: str):
+    async def llm_response(self, user_query: str):
         response = await self.agent.ainvoke({"messages": [ SystemMessage(f"{self.system_prompt}") ,HumanMessage(content=user_query)]})
         final_response = response.get('structured_response').response
         if final_response is None:
