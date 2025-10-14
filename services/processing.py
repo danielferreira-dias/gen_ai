@@ -5,7 +5,11 @@ class ProcessingService:
         self.category_map = {
             "PhoneNumber": "NUMBER",
             "Address": "LOCATION_OFFICE",
-            "Person": "PERSON"
+            "Person": "PERSON",
+            "Address":"ADDRESS",
+            "Organization":"ORGANIZATION",
+            "City":"CITY",
+            "Location":"Location",
         }
 
     def tokenize_pii(self, data: dict):

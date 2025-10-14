@@ -18,7 +18,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "conversation_id" not in st.session_state:
-    st.session_state.conversation_id = storage.create_conversation()
+    st.session_state.conversation_id = None
 
 # ---------- TITLE ----------
 st.title("🤖 Agent Chatbot")
@@ -31,30 +31,11 @@ with st.sidebar:
     st.divider()
 
     st.header("Conversation History")
-    if st.button("🗑️ Clear Current Chat"):
-        st.session_state.messages = []
-        st.rerun()
 
     if st.button("New Conversation"):
         st.session_state.messages = []
-        st.session_state.conversation_id = storage.create_conversation()
+        st.session_state.conversation_id = None
         st.rerun()
-
-    # Show recent conversations
-    recent_convs = storage.get_recent_conversations(limit=5)
-    if recent_convs:
-        st.subheader("Recent Chats")
-        for conv in recent_convs:
-            conv_label = f"Chat {conv['id']} ({conv['message_count']} msgs)"
-            if st.button(conv_label, key=f"conv_{conv['id']}"):
-                # Load this conversation
-                st.session_state.conversation_id = conv['id']
-                messages = storage.get_conversation(conv['id'])
-                st.session_state.messages = [
-                    {"role": msg['role'], "content": msg['content']}
-                    for msg in messages
-                ]
-                st.rerun()
 
     st.divider()
 
@@ -84,6 +65,10 @@ if user_input := st.chat_input("Type your message..."):
 
     # Store user message (will update with PII data later if detected)
     user_message_data = None
+
+    # Create conversation on first message
+    if st.session_state.conversation_id is None:
+        st.session_state.conversation_id = storage.create_conversation()
 
     # Create a placeholder for tracing
     with st.spinner("Processing..."):
@@ -163,7 +148,7 @@ if user_input := st.chat_input("Type your message..."):
         conversation_id=st.session_state.conversation_id,
         role="assistant",
         content=response,
-        has_pii=False  # Assistant responses typically don't contain PII
+        has_pii=False  
     )
 
     st.session_state.messages.append({"role": "assistant", "content": response})
