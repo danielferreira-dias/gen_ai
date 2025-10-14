@@ -205,28 +205,6 @@ class EvaluationStorage:
 
         return feedback_id
 
-    def get_feedback_for_message(self, message_id: int) -> Optional[int]:
-        """
-        Get user feedback for a specific message
-
-        Args:
-            message_id: The message ID
-
-        Returns:
-            Feedback value (0 or 1) or None if no feedback exists
-        """
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        cursor.execute(
-            "SELECT feedback FROM user_feedback WHERE message_id = ? ORDER BY created_at DESC LIMIT 1",
-            (message_id,)
-        )
-        result = cursor.fetchone()
-        conn.close()
-
-        return result[0] if result else None
-
     def _update_daily_metrics(self, cursor, date):
         """
         Update daily metrics aggregation table
