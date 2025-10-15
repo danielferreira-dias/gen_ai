@@ -1,0 +1,86 @@
+{
+  "dataset_info": {
+    "name": "Porto Trip Assistant Ground Truth Dataset",
+    "version": "1.0",
+    "created_date": "2025-10-15",
+    "description": "Ground truth dataset for evaluating a trip assistant specialized in Porto, Portugal",
+    "total_examples": 15
+  },
+  "examples": [
+    {
+      "id": "gt_001",
+      "query": "What are the must-see attractions in Porto?",
+      "expected_response": "The must-see attractions in Porto include: Livraria Lello (one of the world's most beautiful bookstores), the Dom Luís I Bridge offering stunning views of the city, Ribeira district with its colorful riverside buildings, Clérigos Tower for panoramic views, São Bento Railway Station known for its azulejo tiles, the Porto Cathedral (Sé do Porto), and the Port wine cellars in Vila Nova de Gaia where you can taste authentic Port wine."
+    },
+    {
+      "id": "gt_002",
+      "query": "Where can I try authentic Francesinha?",
+      "expected_response": "For authentic Francesinha in Porto, I recommend: Café Santiago (a local favorite with generous portions), Lado B Café (known for creative variations), Bufete Fase (traditional preparation), or Brasão Cervejaria (modern take with craft beer). Francesinha is Porto's iconic sandwich with layers of meat, covered in melted cheese and a rich beer-tomato sauce, typically served with fries."
+    },
+    {
+      "id": "gt_003",
+      "query": "How do I get from Porto airport to the city center?",
+      "expected_response": "You have several options to get from Porto Airport to the city center: The Metro (Line E - Violet Line) is the most economical option, taking about 30 minutes to reach the center and costing around €2. Taxis cost approximately €20-25 and take 20-25 minutes. Uber/Bolt are also available at similar prices. Airport buses (lines 601, 602, 604) are another budget option. The Metro runs from 6am to 1am daily."
+    },
+    {
+      "id": "gt_004",
+      "query": "What's the best time of year to visit Porto?",
+      "expected_response": "The best time to visit Porto is during late spring (May-June) or early fall (September-October). During these months, you'll enjoy pleasant temperatures (18-25°C), fewer crowds than summer, and lower prices. Summer (July-August) is warm and lively but crowded. Winter (December-February) is mild but rainier, though it's great for experiencing Port wine culture indoors. São João Festival in June is a highlight if you enjoy local celebrations."
+    },
+    {
+      "id": "gt_005",
+      "query": "Can you recommend a Port wine tasting experience?",
+      "expected_response": "For Port wine tasting, cross the Dom Luís I Bridge to Vila Nova de Gaia where most Port wine cellars are located. Top recommendations include: Taylor's (excellent tours with stunning views), Graham's (intimate tastings and terrace views), Sandeman (iconic brand with costumed guides), Ferreira (traditional Portuguese cellar), and Calem (interactive museum experience). Most cellars offer guided tours for €12-20 including tastings. Book in advance during peak season."
+    },
+    {
+      "id": "gt_006",
+      "query": "Is Porto a walkable city?",
+      "expected_response": "Yes, Porto is very walkable, especially the historic center and Ribeira district. However, be prepared for steep hills and cobblestone streets, so wear comfortable walking shoes. The city is built on hills along the Douro River, which means some areas require climbing. For longer distances or to save energy, use the Metro, historic trams (Line 1), or the funicular (Funicular dos Guindais). Walking is the best way to discover Porto's charming narrow streets and hidden corners."
+    },
+    {
+      "id": "gt_007",
+      "query": "What neighborhoods should I stay in Porto?",
+      "expected_response": "The best neighborhoods to stay in Porto are: Ribeira (riverside charm, very touristy but atmospheric), Baixa/City Center (central location, good transport links), Cedofeita (trendy, artsy, with boutiques and cafes), Foz do Douro (beachside, more residential and quieter), and Miragaia (authentic, close to attractions but less crowded). Ribeira and Baixa are ideal for first-time visitors wanting to be near major sights. Cedofeita suits those wanting a local vibe with nightlife."
+    },
+    {
+      "id": "gt_008",
+      "query": "How much should I budget per day in Porto?",
+      "expected_response": "Daily budget for Porto depends on your travel style: Budget travelers can manage with €40-60 (hostel, local eateries, free attractions); Mid-range travelers should budget €80-120 (modest hotel, mix of restaurants, paid attractions and tours); Luxury travelers should expect €150+ (upscale hotels, fine dining, private tours). Porto is generally affordable compared to other Western European cities. A meal at a local restaurant costs €8-15, while tourist restaurants are €15-25 per person."
+    },
+    {
+      "id": "gt_009",
+      "query": "What are some good day trips from Porto?",
+      "expected_response": "Excellent day trips from Porto include: Douro Valley (wine region with stunning terraced vineyards, 2 hours by train or car), Aveiro (Portugal's 'Venice' with colorful boats, 1 hour by train), Guimarães (medieval town, birthplace of Portugal, 1 hour), Braga (religious center with Bom Jesus sanctuary, 1 hour), Costa Nova (beach town with striped houses, 1.5 hours), and Coimbra (historic university city, 1.5 hours). Douro Valley is the most popular for wine lovers."
+    },
+    {
+      "id": "gt_010",
+      "query": "Where can I watch the sunset in Porto?",
+      "expected_response": "The best sunset spots in Porto are: Jardim do Morro in Vila Nova de Gaia (iconic views across the Douro River with the city backdrop), Serra do Pilar viewpoint (next to the monastery), Miradouro da Vitória (romantic spot in the city), top of Clérigos Tower (360-degree views), rooftop bars like The Yeatman or Ribeira Square along the riverside. Jardim do Morro is particularly popular with locals who gather for sunset picnics. Arrive 30 minutes before sunset for the best spots."
+    },
+    {
+      "id": "gt_011",
+      "query": "Do I need to speak Portuguese in Porto?",
+      "expected_response": "While Portuguese is the local language, you don't necessarily need to speak it in Porto. Many people in the tourism industry, restaurants, and hotels speak English, especially in central areas. Younger Portuguese people generally speak good English. However, learning basic phrases like 'obrigado/a' (thank you), 'por favor' (please), and 'bom dia' (good morning) is appreciated by locals. In less touristy neighborhoods or traditional establishments, English may be limited, but people are generally friendly and helpful."
+    },
+    {
+      "id": "gt_012",
+      "query": "What's the typical weather in Porto?",
+      "expected_response": "Porto has a Mediterranean climate with Atlantic influences. Summers (June-September) are warm and dry with temperatures of 20-28°C, though occasionally reaching 35°C during heat waves. Winters (December-February) are mild (8-15°C) but wet, with frequent rain. Spring and fall are pleasant with moderate temperatures (15-22°C). Porto can be windy due to its coastal location. Rain is common from October to March, so pack a light rain jacket. The nearby Atlantic Ocean moderates temperatures year-round."
+    },
+    {
+      "id": "gt_013",
+      "query": "Are there beaches in Porto?",
+      "expected_response": "Yes, Porto has several beaches along its Atlantic coastline. The main beaches are in the Foz do Douro district: Praia de Matosinhos (popular with surfers and locals, wide sandy beach), Praia do Molhe (near the lighthouse), Praia dos Ingleses (smaller, sheltered), and Praia de Gondarém. These beaches are easily accessible by tram or bus from the city center (20-30 minutes). The water is typically cool (16-20°C) even in summer due to Atlantic currents. Beaches have facilities, restaurants, and are great for sunset walks."
+    },
+    {
+      "id": "gt_014",
+      "query": "What traditional foods should I try in Porto besides Francesinha?",
+      "expected_response": "Beyond Francesinha, must-try Porto foods include: Bacalhau (salted cod prepared many ways), Tripas à moda do Porto (tripe stew, Porto's traditional dish), Alheira (smoked sausage), Caldo Verde (kale and potato soup), Polvo à Lagareiro (octopus with olive oil and potatoes), Pastéis de Nata (custard tarts), and Pão de Ló (sponge cake). For snacks, try Bifana (pork sandwich) and Prego (steak sandwich). Pair meals with Vinho Verde (green wine) or Port wine for dessert."
+    },
+    {
+      "id": "gt_015",
+      "query": "How many days do I need to visit Porto?",
+      "expected_response": "I recommend spending 2-3 days in Porto to see the main attractions comfortably. With 2 days, you can cover the historic center, Ribeira, Port wine cellars, and major landmarks. With 3 days, you can explore at a more relaxed pace, visit neighborhoods like Foz or Cedofeita, and take a day trip to Douro Valley or Guimarães. If you have more time, 4-5 days allows for multiple day trips and deeper exploration of Porto's food scene, markets, and hidden gems. The city is compact enough for a weekend but offers plenty for longer stays."
+    }
+  ]
+}
