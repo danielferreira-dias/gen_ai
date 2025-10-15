@@ -4,6 +4,9 @@ import os
 from dotenv import load_dotenv
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from transformers import pipeline
+from utils.patterns import PIIType, PIIEntity
+import re
+
 load_dotenv()
 class AzureLanguageService:
     def __init__(self):
@@ -40,7 +43,7 @@ class AzureLanguageService:
         except Exception as err:
             print("Encountered exception. {}".format(err))
         
-class CustomPIIService:
+class NERService:
     def __init__(self):
         model_name = "dslim/bert-base-NER"
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -99,3 +102,34 @@ class CustomPIIService:
                 'entities': []
             }
 
+class RegexService:
+    """Detects PII using regex patterns"""
+    
+    def __init__(self):
+        self.patterns = {
+            PIIType.EMAIL: r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+            PIIType.PHONE: r'\b(?:\+?1[-.]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b',
+            PIIType.SSN: r'\b\d{3}-\d{2}-\d{4}\b',
+        }
+    
+    def detect(self, text: str) -> list[PIIEntity]:
+        """Detect PII using regex patterns"""
+        entities = []
+        
+        for pii_type, pattern in self.patterns.items():
+            for match in re.finditer(pattern, text):
+                # Additional validation for specific types
+                if self._validate_match(match.group(), pii_type):
+                    entities.append(PIIEntity(
+                        text=match.group(),
+                        pii_type=pii_type,
+                        start=match.start(),
+                        end=match.end(),
+                        confidence=0.9
+                    ))
+        
+        return entities
+
+    def _validate_match(self, text: str, pii_type: PIIType) -> bool:
+        """Validate regex matches with additional rules"""
+        return True

@@ -1,5 +1,5 @@
 from services.agent import Agent
-from services.pii import AzureLanguageService, CustomPIIService
+from services.pii import AzureLanguageService, NERService
 from dotenv import load_dotenv
 import asyncio
 from services.processing import ProcessingService
@@ -44,7 +44,7 @@ async def main():
     #     print(('=' * 30) + 'Agent Response (De-tokenized)' + ('=' * 30))
     #     print(f'{detokenized_response}')
     #     print('=' * 60)
-    ner = CustomPIIService()
+    ner = NERService()
     response = ner.recognize_entities("My name is Daniel Dias, I work at LudusCristalTec in Porto, in Rua dos Engenheiros, yesterday I spoke with Maria Junah")
     print(response)
 
