@@ -3,9 +3,10 @@ from services.evaluation_service import LLMJudge
 import streamlit as st
 import asyncio
 import logging
-from services.processing import ProcessingService
-from services.pii import AzureLanguageService
-from services.agent import Agent
+from services.process_service import ProcessingService
+from services.pii_service import AzureLanguageService
+from services.agent_service import Agent
+from services.chroma_service import ChromaService, EmbeddingModel
 from database.storage import ConversationStorage
 
 # Setup logging
@@ -20,6 +21,8 @@ st.set_page_config(page_title="PII-Aware Chatbot", page_icon="")
 
 logger.info("Initializing services...")
 azure_service = AzureLanguageService()
+embedding_model = EmbeddingModel(model_id="sentence-transformers/all-MiniLM-L6-v2")
+chroma_service = ChromaService(embedding_model=embedding_model)
 agent = Agent(model_name="gpt-5-chat")
 llm_judge = LLMJudge( model_name="gpt-5-chat", db_path="./db/evaluation.db")
 processing_Service = ProcessingService()

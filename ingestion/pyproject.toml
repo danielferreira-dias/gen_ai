@@ -1,0 +1,19 @@
+[project]
+name = "docling_ingestion"
+version = "0.1.0"
+description = "Docling Ingestion"
+requires-python = "==3.11.13"
+dependencies = [
+    "chromadb>=1.1.1",
+    "langchain-chroma>=0.2.6",
+    "langchain-community>=0.3.30",
+    "langchain-core>=0.3.77",
+    "langchain-docling>=1.1.0",
+    "langchain-huggingface>=0.3.1",
+    "langchain-openai>=0.3.34",
+    "langchain-pinecone>=0.2.12",
+    "openai>=2.1.0",
+    "pinecone-client>=6.0.0",
+    "python-dotenv>=1.1.1",
+    "sentence-transformers>=5.1.1",
+]
