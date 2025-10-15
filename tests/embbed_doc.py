@@ -1,18 +1,16 @@
-from langchain_community.document_loaders import WebBaseLoader
+from langchain_community.document_loaders import UnstructuredMarkdownLoader
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+import os
 
-# List of URLs to load documents from
-urls = [
-    "https://lilianweng.github.io/posts/2023-06-23-agent/",
-    "https://lilianweng.github.io/posts/2023-03-15-prompt-engineering/",
-    "https://lilianweng.github.io/posts/2023-10-25-adv-attack-llm/",
-]
+# Get the path to the Porto markdown file
+current_dir = os.path.dirname(os.path.abspath(__file__))
+porto_file_path = os.path.join(current_dir, "porto.md")
 
-# Load documents from the URLs
-docs = [WebBaseLoader(url).load() for url in urls]
-docs_list = [item for sublist in docs for item in sublist]
+# Load the Porto markdown document
+loader = UnstructuredMarkdownLoader(porto_file_path)
+docs_list = loader.load()
 
 # Initialize a text splitter with specified chunk size and overlap
 text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
