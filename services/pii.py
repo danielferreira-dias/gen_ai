@@ -2,6 +2,8 @@ from azure.ai.textanalytics import TextAnalyticsClient
 from azure.core.credentials import AzureKeyCredential
 import os 
 from dotenv import load_dotenv
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+from transformers import pipeline
 load_dotenv()
 class AzureLanguageService:
     def __init__(self):
@@ -40,5 +42,60 @@ class AzureLanguageService:
         
 class CustomPIIService:
     def __init__(self):
-        pass
-        
+        model_name = "dslim/bert-base-NER"
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForTokenClassification.from_pretrained(model_name)
+        self.ner_pipeline = pipeline("ner", model=self.model, tokenizer=self.tokenizer, aggregation_strategy="simple")
+
+        # Map BERT-NER categories to your category format
+        self.category_map = {
+            "PER": "Person",
+            "ORG": "Organization",
+            "LOC": "Location",
+            "MISC": "MISC"
+        }
+
+    def recognize_entities(self, user_query: str):
+        try:
+            # Run NER on the input text
+            entities = self.ner_pipeline(user_query)
+
+            # Create redacted text by replacing entities with their labels
+            redacted_text = user_query
+            # Sort entities by offset in reverse to avoid index shifting
+            sorted_entities = sorted(entities, key=lambda x: x['start'], reverse=True)
+            for entity in sorted_entities:
+                start = entity['start']
+                end = entity['end']
+                mapped_category = self.category_map.get(entity['entity_group'], entity['entity_group'])
+                redacted_text = redacted_text[:start] + f"[{mapped_category}]" + redacted_text[end:]
+
+            # Format output similar to Azure PII service
+            result_dict = {
+                'id': '0',
+                'redacted_text': redacted_text,
+                'is_error': False,
+                'entities': [
+                    {
+                        'text': entity['word'],
+                        'category': self.category_map.get(entity['entity_group'], entity['entity_group']),
+                        'subcategory': None,
+                        'offset': entity['start'],
+                        'length': entity['end'] - entity['start'],
+                        'confidence_score': float(entity['score'])
+                    }
+                    for entity in entities
+                ]
+            }
+
+            return result_dict
+
+        except Exception as err:
+            print(f"Encountered exception: {err}")
+            return {
+                'id': '0',
+                'redacted_text': user_query,
+                'is_error': True,
+                'entities': []
+            }
+
