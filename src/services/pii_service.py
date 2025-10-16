@@ -4,7 +4,6 @@ import os
 from dotenv import load_dotenv
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from transformers import pipeline
-import spacy
 from utils.patterns import PIIType, PIIEntity
 import re
 
@@ -63,11 +62,7 @@ class NERService:
 
     def recognize_entities(self, user_query: str):
         try:
-            if self.model_type == "spacy":
-                return self._recognize_with_spacy(user_query)
-            else:
-                return self._recognize_with_bert(user_query)
-
+            return self._recognize_with_bert(user_query)
         except Exception as err:
             print(f"Encountered exception: {err}")
             return {
@@ -149,15 +144,7 @@ class RegexService:
         return True
 
 class CustomPIIService:
-    """Custom PII service that combines NER and Regex detection"""
-
     def __init__(self, model_type: str = "bert"):
-        """
-        Initialize the custom PII service with both NER and Regex services
-
-        Args:
-            model_type: The model type for NER service ("bert" or "spacy")
-        """
         self.ner_service = NERService(model_type=model_type)
         self.regex_service = RegexService()
 
