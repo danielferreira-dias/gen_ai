@@ -101,7 +101,6 @@ class ChromaService:
 
         return formatted_results
 
-
 # Usage example
 async def main():
     """Example usage of ChromaService"""

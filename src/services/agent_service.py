@@ -97,7 +97,7 @@ IMPORTANT: You have access to a tool called 'get_knowledge_base_answer' that sea
                 response_parts = ["Here's what I found in the knowledge base:\n"]
 
                 for i, result in enumerate(results, 1):
-                    response_parts.append(f"\n{i}. {result['Content'][:300]}...")
+                    response_parts.append(f"\n{i}. {result['Content']}...")
                     response_parts.append(f"   (Source: {result['Source']}, Relevance Score: {result['Score']:.4f})")
 
                 final_response = "\n".join(response_parts)
