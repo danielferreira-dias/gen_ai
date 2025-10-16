@@ -13,7 +13,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 load_dotenv()
 
-
 class EmbeddingModel:
     """Wrapper for HuggingFace embedding models"""
     def __init__(self, model_id: str):
@@ -22,8 +21,6 @@ class EmbeddingModel:
         logger.info(f'✓ Loaded embedding model: {model_id}')
 
 class ChromaService:
-    """Service for vector similarity search using ChromaDB"""
-
     def __init__(self, embedding_model: EmbeddingModel, persist_directory: str = None):
         """
         Initialize ChromaDB service
@@ -33,20 +30,15 @@ class ChromaService:
             persist_directory: Path to ChromaDB storage (defaults to src/db/chroma.sqlite3)
         """
         self.embedding_model = embedding_model
-
-        # Default to the database location you specified
+        
         if persist_directory is None:
             persist_directory = os.path.join(
                 os.path.dirname(os.path.dirname(__file__)),
                 'db',
-                'chroma_db'  # Added chroma_db subdirectory
+                'chroma_db' 
             )
 
-        self.vectorstore = Chroma(
-            collection_name="porto_docs",
-            embedding_function=embedding_model.embeddings,
-            persist_directory=persist_directory
-        )
+        self.vectorstore = Chroma( collection_name="porto_docs", embedding_function=embedding_model.embeddings, persist_directory=persist_directory)
         logger.info(f'✓ Connected to ChromaDB at {persist_directory}')
 
     async def search_documents(self, user_query: str, k: int = 5):
@@ -81,10 +73,7 @@ class ChromaService:
         """
         logger.info(f"ChromaService.search_with_scores called with query: '{user_query}', k={k}")
 
-        results_with_scores = await self.vectorstore.asimilarity_search_with_score(
-            query=user_query,
-            k=k
-        )
+        results_with_scores = await self.vectorstore.asimilarity_search_with_score(query=user_query,k=k)
 
         logger.info(f"ChromaDB returned {len(results_with_scores)} raw results")
 
