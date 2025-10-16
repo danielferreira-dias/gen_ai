@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from utils.prompts import llm_judge_prompt
 from database.evaluation import EvaluationStorage
 import logging
 import os
 import re
+import time
 from dotenv import load_dotenv
 from langchain_openai import AzureChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
@@ -131,4 +132,109 @@ class LLMJudge(EvaluationService):
             overall_score=0,
             rationale=f"Evaluation failed - {reason}"
         )
+
+class LightHeuristic:
+    def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+    def calculate_heuristics(
+        self,
+        agent_response: str,
+        retrieved_docs: Optional[List[Dict[str, Any]]] = None,
+        response_time_ms: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """
+        Calculate lightweight heuristics for a chatbot response.
+
+        Args:
+            agent_response: The chatbot's response text
+            retrieved_docs: Optional list of retrieved documents with metadata
+            response_time_ms: Optional response time in milliseconds
+
+        Returns:
+            Dictionary containing heuristic metrics
+        """
+        try:
+            heuristics = {
+                "response_length": self._calculate_response_length(agent_response),
+                "has_citation": self._check_citations(agent_response),
+                "retrieval_confidence": self._calculate_retrieval_confidence(retrieved_docs),
+                "response_time_ms": response_time_ms if response_time_ms is not None else 0,
+                "num_docs_retrieved": len(retrieved_docs) if retrieved_docs else 0
+            }
+
+            self.logger.info(f"Calculated heuristics: {heuristics}")
+            return heuristics
+
+        except Exception as e:
+            self.logger.error(f"Error calculating heuristics: {str(e)}")
+            return self._get_default_heuristics()
+
+    def _calculate_response_length(self, response: str) -> int:
+        """Calculate the length of the response in characters."""
+        return len(response.strip())
+
+    def _check_citations(self, response: str) -> bool:
+        """
+        Check if the response contains citations or references.
+        Looks for common citation patterns like [1], (Source), etc.
+        """
+        citation_patterns = [
+            r'\[\d+\]',  # [1], [2], etc.
+            r'\(\d+\)',  # (1), (2), etc.
+            r'\[.*?\]',  # [Source], [Document], etc.
+            r'(?i)(source:|reference:|according to)',  # Text-based citations
+        ]
+
+        for pattern in citation_patterns:
+            if re.search(pattern, response):
+                return True
+        return False
+
+    def _calculate_retrieval_confidence(
+        self,
+        retrieved_docs: Optional[List[Dict[str, Any]]]
+    ) -> float:
+        """
+        Calculate confidence score based on retrieved documents.
+        Uses similarity scores or relevance scores if available.
+        """
+        if not retrieved_docs:
+            return 0.0
+
+        try:
+            # Try to extract scores from retrieved documents
+            scores = []
+            for doc in retrieved_docs:
+                # Check for common score field names
+                score = (
+                    doc.get('score') or
+                    doc.get('similarity') or
+                    doc.get('relevance_score') or
+                    doc.get('confidence')
+                )
+                if score is not None:
+                    scores.append(float(score))
+
+            if scores:
+                # Return average score
+                return round(sum(scores) / len(scores), 2)
+            else:
+                # If no scores available, return a default based on number of docs
+                # More docs retrieved suggests higher confidence up to a point
+                return min(0.5 + (len(retrieved_docs) * 0.1), 1.0)
+
+        except Exception as e:
+            self.logger.warning(f"Error calculating retrieval confidence: {str(e)}")
+            return 0.0
+
+    def _get_default_heuristics(self) -> Dict[str, Any]:
+        """Return default heuristics when calculation fails."""
+        return {
+            "response_length": 0,
+            "has_citation": False,
+            "retrieval_confidence": 0.0,
+            "response_time_ms": 0,
+            "num_docs_retrieved": 0
+        }
 

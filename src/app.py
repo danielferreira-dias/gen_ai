@@ -1,8 +1,9 @@
 from database.evaluation import EvaluationStorage
-from services.evaluation_service import LLMJudge
+from services.evaluation_service import LLMJudge, LightHeuristic
 import streamlit as st
 import asyncio
 import logging
+import time
 from services.process_service import ProcessingService
 from services.pii_service import AzureLanguageService
 from services.agent_service import Agent
@@ -23,8 +24,9 @@ logger.info("Initializing services...")
 azure_service = AzureLanguageService()
 embedding_model = EmbeddingModel(model_id="sentence-transformers/all-MiniLM-L6-v2")
 chroma_service = ChromaService(embedding_model=embedding_model)
-agent = Agent(model_name="gpt-5-chat")
+agent = Agent(model_name="gpt-5-chat", chroma_service=chroma_service)
 llm_judge = LLMJudge( model_name="gpt-5-chat", db_path="./db/evaluation.db")
+light_heuristic = LightHeuristic()
 processing_Service = ProcessingService()
 logger.info("Services initialized successfully")
 
@@ -197,22 +199,64 @@ if user_input := st.chat_input("Type your message..."):
 
     # ---------- AGENT RESPONSE ----------
     with st.spinner("Agent is thinking..."):
+        # Start timing for heuristics
+        start_time = time.time()
+
         # Fetch conversation history from database (excluding current message)
         # This retrieves messages with tokenized content if PII was detected
         logger.info(f"Fetching conversation context (conversation_id: {st.session_state.conversation_id})")
         conversation_context = storage.get_conversation_context(
             conversation_id=st.session_state.conversation_id,
-            limit=20 
+            limit=20
         )
         logger.info(f"Retrieved {len(conversation_context) if conversation_context else 0} messages from history")
 
         # Pass conversation history to agent
         logger.info(f"Invoking agent with query: {tokenized_text[:50]}...")
-        response = asyncio.run(agent.llm_response(
+        agent_response = asyncio.run(agent.llm_response(
             user_query=tokenized_text,
             conversation_history=conversation_context
         ))
+
+        # Extract response and tool calls
+        response = agent_response.response
+        tool_calls = agent_response.tool_calls
+
+        # Calculate response time in milliseconds
+        response_time_ms = (time.time() - start_time) * 1000
+
         logger.info(f"Agent response received: {response[:100]}...")
+        logger.info(f"Tool invocations: {len(tool_calls)}")
+        logger.info(f"Response time: {response_time_ms:.2f}ms")
+
+    # Display tool invocations if any
+    if tool_calls:
+        with st.expander("🛠️ Tool Invocations & Vector Search Results", expanded=debug_mode):
+            for idx, tool_call in enumerate(tool_calls, 1):
+                st.write(f"**Tool {idx}: {tool_call['tool_name']}**")
+                st.write(f"Query: `{tool_call['query']}`")
+                st.write(f"Results Found: {tool_call['results_count']}")
+
+                if tool_call['results']:
+                    st.write("**Retrieved Documents:**")
+                    for i, result in enumerate(tool_call['results'], 1):
+                        with st.container():
+                            col1, col2 = st.columns([3, 1])
+                            with col1:
+                                st.markdown(f"**Result {i}**")
+                            with col2:
+                                st.metric("Similarity Score", f"{result['Score']:.4f}")
+
+                            st.markdown(f"*Source:* `{result['Source']}`")
+                            st.text_area(
+                                label=f"Content",
+                                value=result['Content'][:400] + ("..." if len(result['Content']) > 400 else ""),
+                                height=100,
+                                key=f"tool_result_{idx}_{i}",
+                                disabled=True
+                            )
+                if idx < len(tool_calls):
+                    st.divider()
 
     # Store the tokenized assistant response BEFORE de-tokenizing
     # This ensures the agent always sees tokens in conversation history
@@ -263,6 +307,46 @@ if user_input := st.chat_input("Type your message..."):
         has_pii=has_tokens_in_response  # Mark as having PII if we de-tokenized it
     )
     logger.info(f"Assistant message stored successfully (message_id: {assistant_message_id})")
+
+    # ---------- LIGHTWEIGHT HEURISTICS ----------
+    try:
+        # Prepare retrieved documents data from tool calls
+        retrieved_docs = []
+        if tool_calls:
+            for tool_call in tool_calls:
+                if tool_call.get('results'):
+                    for result in tool_call['results']:
+                        retrieved_docs.append({
+                            'content': result.get('Content', ''),
+                            'score': result.get('Score', 0.0),
+                            'source': result.get('Source', '')
+                        })
+
+        # Calculate lightweight heuristics
+        heuristics = light_heuristic.calculate_heuristics(
+            agent_response=detokenized_response,
+            retrieved_docs=retrieved_docs,
+            response_time_ms=response_time_ms
+        )
+
+        logger.info(f"Lightweight heuristics calculated: {heuristics}")
+
+        # Display heuristics in debug mode
+        if debug_mode:
+            with st.expander("📊 Lightweight Heuristics", expanded=True):
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Response Length", heuristics['response_length'])
+                    st.metric("Has Citation", "✅" if heuristics['has_citation'] else "❌")
+                with col2:
+                    st.metric("Retrieval Confidence", f"{heuristics['retrieval_confidence']:.2f}")
+                    st.metric("Response Time", f"{heuristics['response_time_ms']:.0f} ms")
+                with col3:
+                    st.metric("Docs Retrieved", heuristics['num_docs_retrieved'])
+
+    except Exception as e:
+        logger.error(f"Error calculating lightweight heuristics: {e}", exc_info=True)
+        heuristics = {}
 
     # ---------- EVALUATE ANSWER - LLM AS A JUDGE ----------
     # Evaluate AFTER de-tokenization so the judge sees the actual response

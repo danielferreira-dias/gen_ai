@@ -45,49 +45,21 @@ class AzureLanguageService:
             print("Encountered exception. {}".format(err))
         
 class NERService:
-    def __init__(self, model_type: str = "spacy", spacy_model: str = "en_core_web_sm"):
-        """
-        Initialize NER Service with either spaCy or BERT model.
-
-        Args:
-            model_type: Either "spacy" or "bert"
-            spacy_model: Name of spaCy model to use (e.g., "en_core_web_sm", "pt_core_news_sm" for Portuguese)
-        """
+    def __init__(self, model_type: str = "bert"):
         self.model_type = model_type.lower()
 
-        if self.model_type == "spacy":
-            # Load spaCy model
-            try:
-                self.nlp = spacy.load(spacy_model)
-            except OSError:
-                print(f"spaCy model '{spacy_model}' not found. Run: python -m spacy download {spacy_model}")
-                raise
+        model_name = "dslim/bert-base-NER"
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForTokenClassification.from_pretrained(model_name)
+        self.ner_pipeline = pipeline("ner", model=self.model, tokenizer=self.tokenizer, aggregation_strategy="simple")
 
-            # Map spaCy entity types to your category format
-            self.category_map = {
-                "PERSON": "Person",
-                "PER": "Person",
-                "ORG": "Organization",
-                "GPE": "Location",  # Geopolitical entity
-                "LOC": "Location",
-                "MISC": "MISC"
-            }
-        elif self.model_type == "bert":
-            # Load BERT model
-            model_name = "dslim/bert-base-NER"
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.model = AutoModelForTokenClassification.from_pretrained(model_name)
-            self.ner_pipeline = pipeline("ner", model=self.model, tokenizer=self.tokenizer, aggregation_strategy="simple")
-
-            # Map BERT-NER categories to your category format
-            self.category_map = {
-                "PER": "Person",
-                "ORG": "Organization",
-                "LOC": "Location",
-                "MISC": "MISC"
-            }
-        else:
-            raise ValueError(f"Invalid model_type: {model_type}. Choose 'spacy' or 'bert'")
+        # Map BERT-NER categories to your category format
+        self.category_map = {
+            "PER": "Person",
+            "ORG": "Organization",
+            "LOC": "Location",
+            "MISC": "MISC"
+        }
 
     def recognize_entities(self, user_query: str):
         try:
@@ -104,50 +76,6 @@ class NERService:
                 'is_error': True,
                 'entities': []
             }
-
-    def _recognize_with_spacy(self, user_query: str):
-        """Recognize entities using spaCy"""
-        doc = self.nlp(user_query)
-
-        # Extract entities
-        entities = []
-        for ent in doc.ents:
-            mapped_category = self.category_map.get(ent.label_, ent.label_)
-            entities.append({
-                'text': ent.text,
-                'category': mapped_category,
-                'start': ent.start_char,
-                'end': ent.end_char,
-                'label': ent.label_
-            })
-
-        # Create redacted text by replacing entities with their labels
-        redacted_text = user_query
-        sorted_entities = sorted(entities, key=lambda x: x['start'], reverse=True)
-        for entity in sorted_entities:
-            start = entity['start']
-            end = entity['end']
-            redacted_text = redacted_text[:start] + f"[{entity['category']}]" + redacted_text[end:]
-
-        # Format output similar to Azure PII service
-        result_dict = {
-            'id': '0',
-            'redacted_text': redacted_text,
-            'is_error': False,
-            'entities': [
-                {
-                    'text': entity['text'],
-                    'category': entity['category'],
-                    'subcategory': None,
-                    'offset': entity['start'],
-                    'length': entity['end'] - entity['start'],
-                    'confidence_score': 0.85  # spaCy doesn't provide confidence scores by default
-                }
-                for entity in entities
-            ]
-        }
-
-        return result_dict
 
     def _recognize_with_bert(self, user_query: str):
         """Recognize entities using BERT"""
@@ -186,18 +114,13 @@ class NERService:
         return result_dict
 
 class RegexService:
-
     def __init__(self):
         self.patterns = {
             PIIType.EMAIL: r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
             PIIType.PHONE: r'(?:' + '|'.join([
-                # US phone formats
                 r'\b(?:\+?1[-.]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b',
-                # Portuguese mobile: +351 9XX XXX XXX or 9XX XXX XXX
                 r'\b(?:\+351\s?)?9[1236]\d{1}\s?\d{3}\s?\d{3}\b',
-                # Portuguese landline: +351 2XX XXX XXX or 2XX XXX XXX
                 r'\b(?:\+351\s?)?2[1-9]\d{1}\s?\d{3}\s?\d{3}\b',
-                # Portuguese with parentheses: (+351) 9XX XXX XXX
                 r'\b\(\+351\)\s?[29]\d{1}\s?\d{3}\s?\d{3}\b',
             ]) + r')',
             PIIType.SSN: r'\b\d{3}-\d{2}-\d{4}\b',
@@ -224,3 +147,67 @@ class RegexService:
     def _validate_match(self, text: str, pii_type: PIIType) -> bool:
         """Validate regex matches with additional rules"""
         return True
+
+class CustomPIIService:
+    """Custom PII service that combines NER and Regex detection"""
+
+    def __init__(self, model_type: str = "bert"):
+        """
+        Initialize the custom PII service with both NER and Regex services
+
+        Args:
+            model_type: The model type for NER service ("bert" or "spacy")
+        """
+        self.ner_service = NERService(model_type=model_type)
+        self.regex_service = RegexService()
+
+    def detect_pii(self, text: str) -> dict:
+        # Get NER results
+        ner_results = self.ner_service.recognize_entities(text)
+
+        # Get Regex results
+        regex_entities = self.regex_service.detect(text)
+
+        # Convert regex entities to the same format as NER entities
+        regex_formatted = [
+            {
+                'text': entity.text,
+                'category': entity.pii_type.value,
+                'subcategory': None,
+                'offset': entity.start,
+                'length': entity.end - entity.start,
+                'confidence_score': entity.confidence
+            }
+            for entity in regex_entities
+        ]
+
+        # Combine both entity lists
+        all_entities = ner_results['entities'] + regex_formatted
+
+        # Sort by offset
+        all_entities.sort(key=lambda x: x['offset'])
+
+        # Create redacted text with all entities
+        redacted_text = text
+        sorted_entities = sorted(all_entities, key=lambda x: x['offset'], reverse=True)
+
+        for entity in sorted_entities:
+            start = entity['offset']
+            end = entity['offset'] + entity['length']
+            category = entity['category']
+            redacted_text = redacted_text[:start] + f"[{category}]" + redacted_text[end:]
+
+        return {
+            'id': ner_results['id'],
+            'original_text': text,
+            'redacted_text': redacted_text,
+            'is_error': ner_results['is_error'],
+            'ner_entities': ner_results['entities'],
+            'regex_entities': regex_formatted,
+            'all_entities': all_entities,
+            'entity_count': {
+                'ner': len(ner_results['entities']),
+                'regex': len(regex_formatted),
+                'total': len(all_entities)
+            }
+        }

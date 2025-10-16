@@ -39,11 +39,12 @@ class ChromaService:
         if persist_directory is None:
             persist_directory = os.path.join(
                 os.path.dirname(os.path.dirname(__file__)),
-                'db'
+                'db',
+                'chroma_db'  # Added chroma_db subdirectory
             )
 
         self.vectorstore = Chroma(
-            collection_name="fraud_analysis_docs",
+            collection_name="porto_docs",
             embedding_function=embedding_model.embeddings,
             persist_directory=persist_directory
         )
@@ -79,17 +80,27 @@ class ChromaService:
         Returns:
             List of dictionaries containing search results with scores
         """
+        logger.info(f"ChromaService.search_with_scores called with query: '{user_query}', k={k}")
+
         results_with_scores = await self.vectorstore.asimilarity_search_with_score(
             query=user_query,
             k=k
         )
 
-        return [{
+        logger.info(f"ChromaDB returned {len(results_with_scores)} raw results")
+
+        formatted_results = [{
             'Content': result.page_content,
             'Source': result.metadata.get('source', 'Unknown'),
             'Metadata': result.metadata,
             'Score': score
         } for result, score in results_with_scores]
+
+        logger.info(f"Formatted {len(formatted_results)} results to return")
+        if formatted_results:
+            logger.info(f"First result preview - Score: {formatted_results[0]['Score']:.4f}, Source: {formatted_results[0]['Source']}")
+
+        return formatted_results
 
 
 # Usage example

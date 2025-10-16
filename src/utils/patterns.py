@@ -2,9 +2,9 @@ from enum import Enum
 from dataclasses import dataclass
 
 class PIIType(Enum):
-    EMAIL = "email"
-    PHONE = "phone"
-    SSN = "ssn"
+    EMAIL = "EMAIL"
+    PHONE = "PHONE"
+    SSN = "SSN"
 
 @dataclass
 class PIIEntity:
