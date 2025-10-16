@@ -9,6 +9,8 @@ from services.pii_service import AzureLanguageService
 from services.agent_service import Agent
 from services.chroma_service import ChromaService, EmbeddingModel
 from database.storage import ConversationStorage
+from services.evaluation_service import SemanticSimilarityEvaluator
+
 
 # Setup logging
 logging.basicConfig(
@@ -21,8 +23,11 @@ logger = logging.getLogger(__name__)
 st.set_page_config(page_title="PII-Aware Chatbot", page_icon="")
 
 logger.info("Initializing services...")
+
+# Initialize semantic evaluator with the existing embedding model
 azure_service = AzureLanguageService()
 embedding_model = EmbeddingModel(model_id="sentence-transformers/all-MiniLM-L6-v2")
+semantic_evaluator = SemanticSimilarityEvaluator(embedding_model=embedding_model.embeddings, spacy_model="en_core_web_sm")
 chroma_service = ChromaService(embedding_model=embedding_model)
 agent = Agent(model_name="gpt-5-chat", chroma_service=chroma_service)
 llm_judge = LLMJudge( model_name="gpt-5-chat", db_path="./db/evaluation.db")
@@ -370,6 +375,30 @@ if user_input := st.chat_input("Type your message..."):
         except Exception as e:
             logger.error(f"Error during LLM Judge evaluation: {e}", exc_info=True)
             st.error(f"⚠️ Error during evaluation: {e}")
+
+    # ---------- RESPONSE QUALITY METRICS ----------
+    try:
+        # Extract source document texts from tool_calls
+        source_docs = []
+        if tool_calls:
+            for tool_call in tool_calls:
+                if tool_call.get('results'):
+                    for result in tool_call['results']:
+                        source_docs.append(result.get('Content', ''))
+        
+        semantic_result = semantic_evaluator.evaluate( user_query=user_input, agent_response=detokenized_response, source_documents=source_docs if source_docs else None)
+        logger.info(f"Semantic evaluation: {semantic_result.overall_semantic_score:.3f}")
+        
+        if debug_mode:
+            with st.expander("🔍 Semantic Similarity Evaluation", expanded=True):
+                st.metric("Overall Semantic Score", f"{semantic_result.overall_semantic_score:.3f}")
+                st.metric("Query-Response Similarity", f"{semantic_result.query_response_similarity:.3f}")
+                st.metric("Response-Source Similarity", f"{semantic_result.response_source_max_similarity:.3f}")
+                st.write("**Q-R Keywords:**", semantic_result.query_response_keyword_match['matched_keywords'])
+                st.write("**Source-R Keywords:**", semantic_result.source_response_keyword_match['matched_keywords'])
+                
+    except Exception as e:
+        logger.error(f"Semantic evaluation failed: {e}")
 
     # Store message metadata for feedback widget
     message_index = len(st.session_state.messages)

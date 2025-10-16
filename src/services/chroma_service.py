@@ -21,7 +21,6 @@ class EmbeddingModel:
         self.embeddings = HuggingFaceEmbeddings(model_name=model_id)
         logger.info(f'✓ Loaded embedding model: {model_id}')
 
-
 class ChromaService:
     """Service for vector similarity search using ChromaDB"""
 
