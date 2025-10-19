@@ -2,7 +2,11 @@
 
 A production-ready LLM application that implements comprehensive PII (Personally Identifiable Information) protection and multi-layered evaluation strategies to ensure safe, high-quality responses in production environments.
 
-[![Watch the video](https://img.youtube.com/vi/TVunaf6hkY8/0.jpg)](https://youtu.be/TVunaf6hkY8?si=m9UHXbRZ2vGqKv0L)
+<p align="center">
+  <a href="https://youtu.be/TVunaf6hkY8?si=m9UHXbRZ2vGqKv0L" target="_blank">
+    <img src="https://img.youtube.com/vi/TVunaf6hkY8/0.jpg" alt="Watch the video" width="600">
+  </a>
+</p>
 
 ## Project Overview
 
