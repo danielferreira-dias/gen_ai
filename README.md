@@ -13,7 +13,7 @@ This project addresses two critical challenges in deploying LLM applications:
 
 ### 1. PII Detection Layer
 
-![PII Detection Architecture](./docs/images/pii_detection_architecture.png)
+<img width="2880" height="1288" alt="Privacy_Risk" src="https://github.com/user-attachments/assets/105f18db-2bf4-4fb9-8d1b-c144f99b71fb" />
 
 The PII Detection Layer acts as a protective shield between users and the LLM:
 
@@ -34,7 +34,7 @@ The PII Detection Layer acts as a protective shield between users and the LLM:
 
 ### 2. Continuous Evaluation (Concept)
 
-![Continuous Evaluation Architecture](./docs/images/continuous_evaluation_architecture.png)
+<img width="2828" height="2620" alt="Privacy_Risk_Evaluation" src="https://github.com/user-attachments/assets/fd805b78-73d3-43e0-9832-fef4075b3cf3" />
 
 **Note**: This is a conceptual design for future implementation to enable periodic evaluation of the LLM in production.
 
@@ -61,7 +61,7 @@ The evaluation pipeline will support multiple strategies:
 
 ### 3. A/B Testing Infrastructure
 
-![A/B Testing Architecture](./docs/images/ab_testing_architecture.png)
+<img width="2948" height="1438" alt="AB_Testing" src="https://github.com/user-attachments/assets/3e78c185-7aed-4edb-9411-b688796aca41" />
 
 **Note**: This is a conceptual design for comparing different agent versions in production.
 
